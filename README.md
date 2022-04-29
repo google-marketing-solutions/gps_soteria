@@ -33,13 +33,19 @@ sGTM has feature parity for modelling with the client side JavaScript tag, it
 happens in real time, and enables pulling in external "sensitive" data, so it
 operates in the sweet spot between the two existing approaches.
 
-
 ## Why Soteria?
 
 [Soteria](https://en.wikipedia.org/wiki/Soteria_(mythology)) was the Greek
 Goddess of safety, and deliverance and preservation from harm. Like the goddess,
 this project provides safety from end users to your sensitive value data (e.g.
 profit).
+
+## Implementation
+Ready to start implementing this solution? You can follow the
+[full guide here](./docs/GUIDE.md) that outlines how Server Side Google Tag
+Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
+(or other sensitive data) and report it to Google Analytics in place of revenue
+as the conversion value.
 
 ## Disclaimer
 __This is not an officially supported Google product.__
