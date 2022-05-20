@@ -73,7 +73,7 @@ protects that sensitive data.
 involved, and outlines the flow. This is high level, please see
 [solution details](#solution-details) for further information.
 
-![image1.png](./img/image1.png)
+![image1.jpg](./img/image1.jpg)
 
 ##### *Image 1*
 
@@ -225,7 +225,7 @@ is pulled from Firestore, by using a custom
 
 An overview of the sGTM flow can be seen below.
 
-![image7](./img/image7.png)
+![image7](./img/image7.jpg)
 
 ##### *Image 7*
 
