@@ -11,6 +11,8 @@ of revenue as the conversion value. This enables profit bidding, with real time
 conversion uploads, in a way that protects the sensitive profit data from a
 determined user.
 
+**Note: This implementation only currently works with Google Analytics.**
+
 ![Demo gif](./docs/img/demo.gif)
 
 ## Background
