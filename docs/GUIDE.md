@@ -241,6 +241,10 @@ An overview of the sGTM flow can be seen below.
 
 #### Set up
 
+_NOTE: If the server side container has been deployed to a different Cloud
+provider than Google Cloud, please [follow these additional instructions](
+https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-guide#optional_include_google_cloud_credentials)._
+
 1.  Go to the server side container in
     [tagmanager.google.com](https://tagmanager.google.com/).
 2.  Go to templates -> new variable template.
