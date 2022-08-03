@@ -98,7 +98,7 @@ can purchase. These can be seen below in table 1, along with the average profit
 for each of the items.
 
 The revenue value is displayed to the user, and the average profit for each of
-these items is stored in a document in a Firestore collection.
+these items is stored in a seperate document in a Firestore collection.
 
 | Product | Revenue | Profit |
 |   :-:   |   :-:   |   :-:  |
@@ -196,16 +196,18 @@ event parameters, see [image 5](#image-5).
 ### Firestore
 
 There is a requirement to use Firestore Native, if you've already used Datastore
-mode, then you'll have to create a new project and create the profit data there
+mode, then you'll have to create a new project and store profit data for each
+product in a Firestore document.
 ([read more](https://cloud.google.com/datastore/docs/firestore-or-datastore)).
 
-There is a lot of flexibility in how this can be structured, but for the sample
-[profit variable code](./../src/gtm/profit_variable_template.js), the data must
-be structured in the following way. If the schema is changed, the code will need
-to be updated to reflect this.
+The recommended way is to set each Firestore document ID to the product ID, this
+way it's easy to fetch the right document by a single lookup.
 
-First create a `profit` collection, then add the below profit data to a document
-called `products`.
+First create a `products` collection, then add documents to this collection for
+each product. These documents should have a field with the profit value.
+
+The Firestore collection name, and document field can be set when setting up the 
+variable in sGTM.
 
 ![image6](./img/image6.png)
 
@@ -221,7 +223,7 @@ This is where the magic happens: the data layer in the HTML (see
 [code 1](#code-1) and/or [image 2](#image-2)) contains the revenue value. In the
 server side container the revenue value is swapped for the profit value, which
 is pulled from Firestore, by using a custom
-“[profit variable template](./../src/gtm/profit_variable_template.js)”.
+“[profit variable template](./../src/gtm/firestore-value-template.tpl)”.
 
 An overview of the sGTM flow can be seen below.
 
@@ -235,7 +237,7 @@ An overview of the sGTM flow can be seen below.
 2.  The tag has a custom profit variable attached to it to replace the
     conversion value.
 3.  The profit variable uses a custom variable template
-    ([see code](./../src/gtm/profit_variable_template.js)) to fetch the profit
+    ([see code](./../src/gtm/firestore-value-template.tpl)) to fetch the profit
     data from Firestore and sum the total profit for all purchased items.
 4.  The event is reported to Google Analytics with the updated conversion value.
 
@@ -244,19 +246,17 @@ An overview of the sGTM flow can be seen below.
 1.  Go to the server side container in
     [tagmanager.google.com](https://tagmanager.google.com/).
 2.  Go to templates -> new variable template.
-3.  Copy and paste the
-    [profit variable template code](./../src/gtm/profit_variable_template.js)
-    into the code window.
-4.  Go to the permission tab and set the permissions seen in
-    [image 8](#image-8).
-5.  Save the template.
-6.  Go to variables -> new user defined variable and create a “profit” variable
+3.  Click on the three-dot menu on the top right and choose `Import`.
+4.  Select the [`margin-value-template.tpl`](./../src/gtm/firestore-value-template.tpl) file
+5.  Go to the permission tab and set the permissions for Firestore, example in [image 8](#image-8).
+6.  Save the template.
+7.  Go to variables -> new user defined variable and create a “profit” variable
     from the profit variable template.
-7.  Go to tags -> new.
-8.  Select an Analytics tag and in the “parameters to add / edit” section
+8.  Go to tags -> new.
+9.  Select an Analytics tag and in the “parameters to add / edit” section
     replace value with the profit variable (see [image 9](#image-9)).
-9.  The trigger should be a custom event for purchase events.
-10. Save and deploy the code.
+10.  The trigger should be a custom event for purchase events.
+11. Save and deploy the code.
 
 ![image8](./img/image8.png)
 
