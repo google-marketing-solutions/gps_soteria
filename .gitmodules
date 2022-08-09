@@ -1,4 +1,3 @@
-[submodule "src/gcp/cloud_storage_csv_to_firestore"]
-	path = src/gcp/cloud_storage_csv_to_firestore
-	url = sso://professional-services.googlesource.com/solutions/cloud_storage_csv_to_firestore
-	branch = main
+[submodule "src/gcp/csv_to_firestore"]
+	path = src/gcp/csv_to_firestore
+	url = https://github.com/google/csv-to-firestore
