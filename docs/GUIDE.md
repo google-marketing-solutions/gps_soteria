@@ -22,11 +22,11 @@ This document outlines how
 [Server Side Google Tag Manager](https://developers.google.com/tag-platform/tag-manager/server-side)
 (sGTM) can be used with [Firestore](https://cloud.google.com/firestore), to pull
 in sensitive profit data (or other sensitive data) and report it to Google
-Analytics in place of revenue as the conversion value. This enables a client to
-bid to profit, with real time conversion uploads, in a way that protects the
-sensitive profit data from a determined user.
+Analytics and Google Ads in place of revenue as the conversion value. This enables
+a client to bid to profit, with real time conversion uploads, in a way that
+protects the sensitive profit data from a determined user.
 
-**Note: This implementation only currently works with Google Analytics.**
+**Note: This implementation only currently works with Google Analytics and Google Ads.**
 
 ![demo.gif](./img/demo.gif)
 
@@ -65,7 +65,7 @@ protects that sensitive data.
 -   Access to a Google Cloud project with Firestore in
     [Native mode](https://cloud.google.com/datastore/docs/firestore-or-datastore)
 -   Access to product level profit data in advance of a transaction
--   Google Analytics for conversions
+-   Google Analytics or Google Ads for conversions
 
 ## Architecture
 
@@ -89,7 +89,7 @@ involved, and outlines the flow. This is high level, please see
     which pulls profit data from Firestore and replaces the revenue conversion
     value with the profit.
 4.  The updated event (with profit conversion value) is sent to Google
-    Analytics.
+    Analytics or Google Ads.
 
 ## Demo
 
@@ -227,19 +227,20 @@ is pulled from Firestore, by using a custom
 
 An overview of the sGTM flow can be seen below.
 
-![image7](./img/image7.jpg)
+![image7 Analytics](./img/image7-analytics.png)
+![image7 Ads](./img/image7-ads.png)
 
 ##### *Image 7*
 
 <br>
 
-1.  The purchase event triggers the Analytics tag.
+1.  The purchase event triggers the Analytics tag and/or the Google Ads Conversion tag.
 2.  The tag has a custom profit variable attached to it to replace the
     conversion value.
 3.  The profit variable uses a custom variable template
     ([see code](./../src/gtm/firestore-value-template.tpl)) to fetch the profit
     data from Firestore and sum the total profit for all purchased items.
-4.  The event is reported to Google Analytics with the updated conversion value.
+4.  The event is reported to Google Analytics and/or Google Ads with the updated conversion value.
 
 #### Set up
 
@@ -257,8 +258,10 @@ https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-
 7.  Go to variables -> new user defined variable and create a “profit” variable
     from the profit variable template.
 8.  Go to tags -> new.
-9.  Select an Analytics tag and in the “parameters to add / edit” section
+    - **Google Analytics:** Select an Analytics tag and in the “parameters to add / edit” section
     replace value with the profit variable (see [image 9](#image-9)).
+    - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the configuration add the
+    profit variable to the 'Conversion Value' field. (See [Image 10](#image-10))
 10.  The trigger should be a custom event for purchase events.
 11. Save and deploy the code.
 
@@ -272,6 +275,11 @@ https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-
 
 ##### *Image 9*
 
+<br>
+
+![image10](./img/image10.png)
+
+##### *Image 10*
 <br>
 
 ## Disclaimer
