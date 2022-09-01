@@ -262,8 +262,8 @@ https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-
     replace value with the profit variable (see [image 9](#image-9)).
     - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the configuration add the
     profit variable to the 'Conversion Value' field. (See [Image 10](#image-10))
-10.  The trigger should be a custom event for purchase events.
-11. Save and deploy the code.
+9.  The trigger should be a custom event for purchase events.
+10. Save and deploy the code.
 
 ![image8](./img/image8.png)
 
