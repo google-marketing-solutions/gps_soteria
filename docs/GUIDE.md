@@ -184,8 +184,7 @@ see [image 4](#image-4).
 
 <br>
 
-A purchase event is then configured, which maps the data layer variables to the
-event parameters, see [image 5](#image-5).
+A purchase event is then configured, see [image 5](#image-5).
 
 ![image5](./img/image5.png)
 
@@ -206,7 +205,7 @@ way it's easy to fetch the right document by a single lookup.
 First create a `products` collection, then add documents to this collection for
 each product. These documents should have a field with the profit value.
 
-The Firestore collection name, and document field can be set when setting up the 
+The Firestore collection name, and document field can be set when setting up the
 variable in sGTM.
 
 ![image6](./img/image6.png)
@@ -252,7 +251,7 @@ https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-
     [tagmanager.google.com](https://tagmanager.google.com/).
 2.  Go to templates -> new variable template.
 3.  Click on the three-dot menu on the top right and choose `Import`.
-4.  Select the [`margin-value-template.tpl`](./../src/gtm/firestore-value-template.tpl) file
+4.  Select the [`firestore-value-template.tpl`](./../src/gtm/firestore-value-template.tpl) file
 5.  Go to the permission tab and set the permissions for Firestore, example in [image 8](#image-8).
 6.  Save the template.
 7.  Go to variables -> new user defined variable and create a “profit” variable
