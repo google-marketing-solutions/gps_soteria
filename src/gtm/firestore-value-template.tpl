@@ -118,7 +118,8 @@ function getFirestoreValue(item) {
     return Firestore.read(path, { projectId: data.gcpProjectId })
     .then((result) => {
       if (result.data.hasOwnProperty(data.valueField)) {
-        value = makeNumber(result.data[data.valueField]);
+        const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
+        value = makeNumber(result.data[data.valueField]) * quantity;
       } else {
         logToConsole(
           "Firestore document " +
