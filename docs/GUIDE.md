@@ -2,19 +2,21 @@
 ## Value Based Bidding with Sensitive Data, using Server Side Google Tag Manager & Firestore
 
 
--   [Overview](#overview)
--   [Background](#background)
--   [Prerequisites](#prerequisites)
--   [Architecture](#architecture)
--   [Demo](#demo)
--   [Solution Details](#solution-details)
-    -   [Website](#website)
-    -   [GTM Web Container](#gtm-web-container)
-    -   [Firestore](#firestore)
-    -   [Server Side GTM](#server-side-gtm)
-    -   [Overview](#overview-1)
-    -   [Set up](#set-up)
--   [Disclaimer](#disclaimer)
+- [Overview](#overview)
+- [Background](#background)
+- [Prerequisites](#prerequisites)
+- [Architecture](#architecture)
+- [Demo](#demo)
+- [Solution Details](#solution-details)
+  - [Website](#website)
+  - [GTM Web Container](#gtm-web-container)
+  - [Firestore](#firestore)
+  - [Server Side GTM](#server-side-gtm)
+    - [Overview](#overview-1)
+    - [Set up](#set-up)
+      - [Auth](#auth)
+      - [Google Tag Manager](#google-tag-manager)
+- [Disclaimer](#disclaimer)
 
 ## Overview
 
@@ -98,7 +100,7 @@ can purchase. These can be seen below in table 1, along with the average profit
 for each of the items.
 
 The revenue value is displayed to the user, and the average profit for each of
-these items is stored in a seperate document in a Firestore collection.
+these items is stored in a separate document in a Firestore collection.
 
 | Product | Revenue | Profit |
 |   :-:   |   :-:   |   :-:  |
@@ -196,7 +198,7 @@ A purchase event is then configured, see [image 5](#image-5).
 
 There is a requirement to use Firestore Native, if you've already used Datastore
 mode, then you'll have to create a new project and store profit data for each
-product in a Firestore document.
+product in a Firestore document
 ([read more](https://cloud.google.com/datastore/docs/firestore-or-datastore)).
 
 The recommended way is to set each Firestore document ID to the product ID, this
@@ -226,12 +228,9 @@ is pulled from Firestore, by using a custom
 
 An overview of the sGTM flow can be seen below.
 
-![image7 Analytics](./img/image7-analytics.png)
-![image7 Ads](./img/image7-ads.png)
-
-##### *Image 7*
-
-<br>
+![Architecture Diagram Analytics](
+./img/architecture-diagram-google-analytics.png)
+![Architecture Diagram Ads](./img/architecture-diagram-google-ads.png)
 
 1.  The purchase event triggers the Analytics tag and/or the Google Ads Conversion tag.
 2.  The tag has a custom profit variable attached to it to replace the
@@ -243,43 +242,57 @@ An overview of the sGTM flow can be seen below.
 
 #### Set up
 
-_NOTE: If the server side container has been deployed to a different Cloud
-provider than Google Cloud, please [follow these additional instructions](
-https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-guide#optional_include_google_cloud_credentials)._
+##### Auth
 
-1.  Go to the server side container in
+If the server side container is deployed to App Engine or Cloud Run, then Google
+Tag Manager will use the service account attached to the instance for connecting
+to Firestore.
+
+If the server side container is deployed in a different Cloud provider to Google
+Cloud, please [follow these additional instructions](
+https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-guide#optional_include_google_cloud_credentials)
+to attach a Google Cloud service account to the deployment.
+
+This service account needs to have permission to access the Firestore data.
+
+1. Open the [IAM Service Accounts page](
+   https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google
+   project that contains the sGTM container, and make a note of the service
+   account email.
+   ![Service account email](./img/auth-sgtm-service-account.png)
+2. Open the [IAM page](https://console.cloud.google.com/iam-admin/iam) for the
+   Firestore project, and press grant access.
+   ![Firestore project grant IAM access](./img/auth-firestore-iam.png)
+3. Add the service account email from step 1, and assign it the `Cloud Datastore
+   User` role ([docs](
+   https://cloud.google.com/iam/docs/understanding-roles#datastore-roles)).
+   ![IAM permissions](./img/auth-iam-permissions.png)
+
+
+##### Google Tag Manager
+
+1. Go to the server side container in
     [tagmanager.google.com](https://tagmanager.google.com/).
-2.  Go to templates -> new variable template.
-3.  Click on the three-dot menu on the top right and choose `Import`.
-4.  Select the [`firestore-value-template.tpl`](./../src/gtm/firestore-value-template.tpl) file
-5.  Go to the permission tab and set the permissions for Firestore, example in [image 8](#image-8).
-6.  Save the template.
-7.  Go to variables -> new user defined variable and create a “profit” variable
-    from the profit variable template.
-8.  Go to tags -> new.
-    - **Google Analytics:** Select an Analytics tag and in the “parameters to add / edit” section
-    replace value with the profit variable (see [image 9](#image-9)).
-    - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the configuration add the
-    profit variable to the 'Conversion Value' field. (See [Image 10](#image-10))
-9.  The trigger should be a custom event for purchase events.
+2. Go to templates -> new variable template.
+3. Click on the three-dot menu on the top right and choose `Import`.
+4. Select the [`firestore-value-template.tpl`](
+   ./../src/gtm/firestore-value-template.tpl) file.
+5. Go to the permission tab and set the permissions for Firestore, ensuring you
+   update the project ID.
+   ![Template permissions](./img/gtm-template-permissions.png)
+6. Save the template.
+7. Go to variables -> new user defined variable and create a “profit” variable
+   from the profit variable template.
+8. Go to tags -> new:
+    - **Google Analytics:** Select an Analytics tag and in the “parameters to
+    add / edit” section replace value with the profit variable.
+    ![Google Analytics Tag](./img/gtm-google-analytics-tag.png)
+    - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the
+    configuration add the profit variable to the 'Conversion Value' field.
+    ![Google Ads Tag](./img/gtm-google-ads-tag.png)
+9. The trigger should be a custom event for purchase events.
 10. Save and deploy the code.
 
-![image8](./img/image8.png)
-
-##### *Image 8*
-
-<br>
-
-![image9](./img/image9.png)
-
-##### *Image 9*
-
-<br>
-
-![image10](./img/image10.png)
-
-##### *Image 10*
-<br>
 
 ## Disclaimer
 
