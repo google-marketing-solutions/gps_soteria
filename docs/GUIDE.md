@@ -34,7 +34,13 @@ protects the sensitive profit data from a determined user.
 
 ##### *Gif 1*
 
-<br>
+_It should be noted in this demo that we’re changing the e-commerce event
+conversion value to the profit. If your intention is to use this with bidding,
+this is a reasonable approach, but be aware that Google Analytics will label the
+profit as “revenue” in the UI, if you’re using e-commerce events. The solution
+provides you with full control of where you report this, so you may need to
+consider which value you use if your goal is to leverage Soteria for reporting
+purposes._
 
 ## Background
 
