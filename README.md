@@ -11,6 +11,9 @@ of revenue as the conversion value. This enables profit bidding, with real time
 conversion uploads, in a way that protects the sensitive profit data from a
 determined user.
 
+Watch [our video on YouTube](https://youtube.com/watch?v=wCJ7XvKs_Ak) for more
+information.
+
 **Note: This implementation only currently works with Google Analytics and Google
 Ads.**
 
@@ -47,7 +50,7 @@ profit).
 Ready to start implementing this solution? You can follow the
 [full guide here](./docs/GUIDE.md) that outlines how Server Side Google Tag
 Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
-(or other sensitive data) and report it to Google Analytics or Google Ads in 
+(or other sensitive data) and report it to Google Analytics or Google Ads in
 place of revenue as the conversion value.
 
 ## Disclaimer
