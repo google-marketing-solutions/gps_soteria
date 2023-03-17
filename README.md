@@ -14,8 +14,6 @@ determined user.
 Watch [our video on YouTube](https://youtube.com/watch?v=wCJ7XvKs_Ak) for more
 information.
 
-**Note: This implementation only currently works with Google Analytics and Google
-Ads.**
 
 ![Demo gif](./docs/img/demo.gif)
 
@@ -50,8 +48,8 @@ profit).
 Ready to start implementing this solution? You can follow the
 [full guide here](./docs/GUIDE.md) that outlines how Server Side Google Tag
 Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
-(or other sensitive data) and report it to Google Analytics or Google Ads in
-place of revenue as the conversion value.
+(or other sensitive data) and report it to Google Analytics, Google Ads or
+Floodlights in place of revenue as the conversion value.
 
 ## Disclaimer
 __This is not an officially supported Google product.__

@@ -28,8 +28,6 @@ Analytics and Google Ads in place of revenue as the conversion value. This enabl
 a client to bid to profit, with real time conversion uploads, in a way that
 protects the sensitive profit data from a determined user.
 
-**Note: This implementation only currently works with Google Analytics and Google Ads.**
-
 ![demo.gif](./img/demo.gif)
 
 ##### *Gif 1*
@@ -81,7 +79,7 @@ protects that sensitive data.
 involved, and outlines the flow. This is high level, please see
 [solution details](#solution-details) for further information.
 
-![image1.jpg](./img/image1.jpg)
+![image1.png](./img/image1.png)
 
 ##### *Image 1*
 
@@ -244,7 +242,8 @@ An overview of the sGTM flow can be seen below.
 3.  The profit variable uses a custom variable template
     ([see code](./../src/gtm/firestore-value-template.tpl)) to fetch the profit
     data from Firestore and sum the total profit for all purchased items.
-4.  The event is reported to Google Analytics and/or Google Ads with the updated conversion value.
+4.  The event is reported to Google Analytics and/or Google Ads and/or
+    Floodlight with the updated conversion value.
 
 #### Set up
 
@@ -296,6 +295,10 @@ This service account needs to have permission to access the Firestore data.
     - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the
     configuration add the profit variable to the 'Conversion Value' field.
     ![Google Ads Tag](./img/gtm-google-ads-tag.png)
+    - **Floodlight:** Select a Floodlight tag and in the configuration, set
+    'Custom configuration' as the 'Data Source' and add the profit variable to
+    the 'Revenue' field.
+    ![Google Ads Tag](./img/gtm-floodlight-tag.png)
 9. The trigger should be a custom event for purchase events.
 10. Save and deploy the code.
 
