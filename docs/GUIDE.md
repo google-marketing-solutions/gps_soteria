@@ -234,7 +234,8 @@ An overview of the sGTM flow can be seen below.
 
 ![Architecture Diagram Analytics](
 ./img/architecture-diagram-google-analytics.png)
-![Architecture Diagram Ads](./img/architecture-diagram-google-ads.png)
+![Architecture Diagram Ads & Floodlight](
+./img/architecture-diagram-google-ads-floodlight.png)
 
 1.  The purchase event triggers the Analytics tag and/or the Google Ads Conversion tag.
 2.  The tag has a custom profit variable attached to it to replace the
