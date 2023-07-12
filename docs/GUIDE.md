@@ -304,6 +304,32 @@ This service account needs to have permission to access the Firestore data.
 10. Save and deploy the code.
 
 
+## Advanced Use-cases
+
+### Combine Return Rate with Profit
+
+If some products are returned more than others, you could calculate the return
+rate percentage at a product level.
+
+Then in Firestore you can add the document with both the profit and return rate:
+
+![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
+
+And use the [firestore-value-return-rate-template.tpl](
+./../src/gtm/firestore-value-return-rate-template.tpl) to factor in both these
+values when calculating the conversion value. The template performs the
+following calculation for each product:
+
+```
+conversion_value = (1 - return_rate) * profit * quantity
+```
+
+### Using AI in place of Firestore
+
+If you're interested in leveraging an AI model instead of static lookups in
+Firestore, then consider the [Phoebe solution on Github](
+https://github.com/google/gps-phoebe).
+
 ## Disclaimer
 
 Copyright 2022 Google LLC. This solution, including any related sample code or
