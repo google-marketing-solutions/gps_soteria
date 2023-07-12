@@ -16,6 +16,9 @@
     - [Set up](#set-up)
       - [Auth](#auth)
       - [Google Tag Manager](#google-tag-manager)
+- [Advanced Use-cases](#advanced-use-cases)
+  - [Combine Return Rate with Profit](#combine-return-rate-with-profit)
+  - [Using AI in place of Firestore](#using-ai-in-place-of-firestore)
 - [Disclaimer](#disclaimer)
 
 ## Overview
