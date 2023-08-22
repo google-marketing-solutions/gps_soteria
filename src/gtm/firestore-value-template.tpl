@@ -57,7 +57,7 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2023 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,6 +76,7 @@ const Promise = require("Promise");
 const getEventData = require("getEventData");
 const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
+const makeString = require("makeString");
 
 /**
  * Sums up all value data in items.
@@ -83,13 +84,14 @@ const makeNumber = require("makeNumber");
 function sumValues(values) {
   let total = 0;
   for (const value of values) {
-    if (value) {
+    if (value != null) {
       total += value;
     } else {
-      logToConsole("Value is 0, undefined or null");
+      logToConsole("Value is undefined or null");
     }
   }
-  return total;
+  // Cast to string as a numeric zero causes sGTM to default to revenue value
+  return makeString(total);
 }
 
 /**
@@ -104,22 +106,35 @@ function getItemValues(items) {
 }
 
 /**
+ * Get the default value for the item.
+ *
+ * This will return 0 if zeroIfNotFound is True in the variable config,
+ * otherwise it will return the revenue value.
+ */
+function getDefaultValue(item) {
+  const itemPrice = data.zeroIfNotFound ? 0 : item.price;
+  const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
+  return makeNumber(itemPrice) * makeNumber(quantity);
+}
+
+/**
  * Looks up the value in Firestore for an item.
  */
 function getFirestoreValue(item) {
   if (!item.item_id) {
     logToConsole("No item ID in item");
-    return data.zeroIfNotFound ? 0 : item.price;
+    return getDefaultValue(item);
   }
 
   return Promise.create((resolve) => {
-    let value = data.zeroIfNotFound ? 0 : item.price;
+    // If the Firestore read fails the default value is returned
+    let value = getDefaultValue(item);
     const path = data.collectionId + "/" + item.item_id;
     return Firestore.read(path, { projectId: data.gcpProjectId })
     .then((result) => {
       if (result.data.hasOwnProperty(data.valueField)) {
         const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
-        value = makeNumber(result.data[data.valueField]) * quantity;
+        value = makeNumber(result.data[data.valueField]) * makeNumber(quantity);
       } else {
         logToConsole(
           "Firestore document " +
