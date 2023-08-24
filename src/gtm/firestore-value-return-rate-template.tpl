@@ -84,7 +84,7 @@ ___SANDBOXED_JS_FOR_SERVER___
  * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
  * new conversion value based on items in the datalayer.
  * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 const Firestore = require("Firestore");
@@ -93,6 +93,7 @@ const getEventData = require("getEventData");
 const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
 const makeString = require("makeString");
+const getType = require('getType');
 
 
 /**
@@ -104,10 +105,10 @@ const makeString = require("makeString");
 function sumValues(values) {
   let total = 0;
   for (const value of values) {
-    if (value != null) {
+    if (getType(value) === 'number') {
       total += value;
     } else {
-      logToConsole("Value is undefined or null");
+      logToConsole("Value is not a number");
     }
   }
   // Cast to string as a numeric zero causes sGTM to default to revenue value
