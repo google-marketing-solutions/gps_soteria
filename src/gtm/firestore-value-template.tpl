@@ -56,21 +56,28 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 /**
- * Copyright 2023 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
+ * new conversion value based on items in the datalayer.
+ * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
+ * @version 1.0.1
  */
+
 const Firestore = require("Firestore");
 const Promise = require("Promise");
 const getEventData = require("getEventData");
@@ -78,8 +85,12 @@ const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
 const makeString = require("makeString");
 
+
 /**
- * Sums up all value data in items.
+ * Sum the numbers provided in the values array.
+ * @param {!Array<number>} values - the values to sum
+ * @returns {string} the total cast to a string. As a numeric zero can cause
+ * unexpected behaviour in sGTM.
  */
 function sumValues(values) {
   let total = 0;
@@ -95,7 +106,12 @@ function sumValues(values) {
 }
 
 /**
- * Fetches all item values in the event data.
+ * Fetch all item values in the event data.
+ * @param {!Array<!Object>} items - an array of items from the datalayer that
+ * follow this schema:
+ * https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item
+ * @returns {!Promise<!Array<number>>} An array of numbers where each number is
+ * the new value for each item.
  */
 function getItemValues(items) {
   const valueRequests = [];
@@ -107,9 +123,11 @@ function getItemValues(items) {
 
 /**
  * Get the default value for the item.
- *
- * This will return 0 if zeroIfNotFound is True in the variable config,
- * otherwise it will return the revenue value.
+ * @param {!Object} item - an item from the datalayer that is expected to follow
+ * this schema:
+ * https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item
+ * @returns {number} will return 0 if zeroIfNotFound is True in the variable
+ * config, otherwise it will return the revenue value.
  */
 function getDefaultValue(item) {
   const itemPrice = data.zeroIfNotFound ? 0 : item.price;
@@ -118,18 +136,25 @@ function getDefaultValue(item) {
 }
 
 /**
- * Looks up the value in Firestore for an item.
+ * Use Firestore to determine what the new value should be for this item.
+ * @param {!Object} item - an item from the datalayer that is expected to follow
+ * this schema:
+ * https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item
+ * @returns {number} the new value for this item based on information in the
+ * Firestore document. If the item cannot be found in Firestore, it falls back
+ * to the default value @see {@link getDefaultValue}.
  */
 function getFirestoreValue(item) {
+  let value = getDefaultValue(item);
+
   if (!item.item_id) {
     logToConsole("No item ID in item");
-    return getDefaultValue(item);
+    return value;
   }
 
+  const path = data.collectionId + "/" + item.item_id;
+
   return Promise.create((resolve) => {
-    // If the Firestore read fails the default value is returned
-    let value = getDefaultValue(item);
-    const path = data.collectionId + "/" + item.item_id;
     return Firestore.read(path, { projectId: data.gcpProjectId })
     .then((result) => {
       if (result.data.hasOwnProperty(data.valueField)) {
@@ -153,6 +178,7 @@ function getFirestoreValue(item) {
   });
 }
 
+// Entry point
 const items = getEventData("items");
 logToConsole('items', items);
 return getItemValues(items)
