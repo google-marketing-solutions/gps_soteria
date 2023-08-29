@@ -84,7 +84,7 @@ ___SANDBOXED_JS_FOR_SERVER___
  * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
  * new conversion value based on items in the datalayer.
  * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
- * @version 1.0.1
+ * @version 1.0.2
  */
 
 const Firestore = require("Firestore");
@@ -93,7 +93,8 @@ const getEventData = require("getEventData");
 const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
 const makeString = require("makeString");
-const getType = require('getType');
+const getType = require("getType");
+const Math = require("Math");
 
 
 /**
@@ -105,7 +106,7 @@ const getType = require('getType');
 function sumValues(values) {
   let total = 0;
   for (const value of values) {
-    if (getType(value) === 'number') {
+    if (getType(value) === "number") {
       total += value;
     } else {
       logToConsole("Value is not a number");
@@ -164,8 +165,16 @@ function getFirestoreValue(item) {
 
   const path = data.collectionId + "/" + item.item_id;
 
+  // Mock API returns a function, whereas usual import is object.
+  // This logic enables support for tests within the function. See
+  // https://developers.google.com/tag-platform/tag-manager/server-side/api#mock
+  let firestore = Firestore;
+  if (getType(Firestore) === "function"){
+    firestore = Firestore();
+  }
+
   return Promise.create((resolve) => {
-    return Firestore.read(path, { projectId: data.gcpProjectId })
+    return firestore.read(path, { projectId: data.gcpProjectId })
     .then((result) => {
       if (result.data.hasOwnProperty(data.valueField) &&
           result.data.hasOwnProperty(data.returnRateField)) {
@@ -174,6 +183,11 @@ function getFirestoreValue(item) {
         const documentValue = makeNumber(result.data[data.valueField]);
         const returnRate = makeNumber(result.data[data.returnRateField]);
         value = (1 - returnRate) * documentValue * quantity;
+        // To address hitting issues with floating point precision round the
+        // number to 2 decimal places. This is the way of achieving that using
+        // the math library. See:
+        // https://developers.google.com/tag-platform/tag-manager/server-side/api#math
+        value = Math.round(value * 100) / 100;
         logToConsole(
           "quantity: " +
           quantity +
@@ -205,7 +219,7 @@ function getFirestoreValue(item) {
 
 // Entry point
 const items = getEventData("items");
-logToConsole('items', items);
+logToConsole("items", items);
 return getItemValues(items)
   .then(sumValues)
   .catch((error) => {
@@ -316,7 +330,95 @@ ___SERVER_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+- name: Test simple profit calculation
+  code: |
+    generateMockData([
+      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2,
+       "return_rate": 0.5},
+      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1,
+       "return_rate": 0.8},
+    ]);
+
+    runCode(mockVariableData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("8.5");
+    });
+- name: Test missing document with one item
+  code: |
+    // Generate only the mocked items, not the Firestore docs.
+    generateMockItems([
+      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2,
+       "return_rate": 0.5},
+    ]);
+
+    runCode(mockVariableData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("0");
+    });
+- name: Test partially missing conversion
+  code: |
+    // Generate only the mocked items, not the Firestore docs.
+    generateMockItems([
+      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2,
+       "return_rate": 0.5},
+      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1,
+       "return_rate": 0.8},
+    ]);
+
+    // Add only one of the docs to Firestore mock.
+    generateMockFirestoreDocs([
+      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1,
+       "return_rate": 0.8},
+    ]);
+
+    runCode(mockVariableData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("1");
+    });
+- name: Test fall back to revenue
+  code: |
+    // Generate only the mocked items, not the Firestore docs.
+    generateMockItems([
+      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2,
+       "return_rate": 0.5},
+    ]);
+
+    // Override the variable to default to revenue.
+    mockVariableData.zeroIfNotFound = false;
+
+    runCode(mockVariableData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("20");
+    });
+setup: "const Promise = require(\"Promise\");\n\n\n// You can override these variables\
+  \ in individual tests\nconst collectionId = \"products\";\nconst valueField = \"\
+  profit\";\nconst returnRateField = \"return_rate\";\n// Mock the variable fields\n\
+  const mockVariableData = {\n  \"valueField\": valueField,\n  \"returnRateField\"\
+  : returnRateField,\n  \"zeroIfNotFound\": true,\n  \"collectionId\": collectionId\n\
+  };\nconst purchasedProducts = [];\nconst firestoreDocs = {};\n\n/**\n * Build the\
+  \ mock data from the items.\n * This method changes the global purchasedProducts\
+  \ & firestoreDocs variables,\n * which are then used in the mock logic.\n * @param\
+  \ {!Array<number>} items - the items to mock.\n */\nfunction generateMockData(items)\
+  \ {\n  generateMockItems(items);\n  generateMockFirestoreDocs(items);\n}\n\n/**\n\
+  \ * Build the mock items from the purchase event.\n * This method changes the global\
+  \ purchasedProducts variable, which is used in\n * the mock logic.\n * @param {!Array<number>}\
+  \ items - the items to mock.\n */\nfunction generateMockItems(items) {\n  for (const\
+  \ item of items) {\n    purchasedProducts.push({\n      \"item_id\": item.item_id,\n\
+  \      \"price\": item.revenue,\n      \"quantity\": item.quantity\n    });\n  }\n\
+  }\n\n/**\n * Build the mock Firestore documents from the items.\n * This method\
+  \ changes the global firestoreDocs variable, which is used in the\n * mock logic.\n\
+  \ * @param {!Array<number>} items - the items to mock.\n */\nfunction generateMockFirestoreDocs(items)\
+  \ {\n  for (const item of items) {\n    // This two step approach is to set a variable\
+  \ as a key in JS, the []\n    // approach doesn't work. See:\n    // https://stackoverflow.com/questions/11508463/javascript-set-object-key-by-variable\n\
+  \    let firestoreDoc = {};\n    firestoreDoc[valueField] = item.profit;\n    firestoreDoc[returnRateField]\
+  \ = item.return_rate;\n    firestoreDocs[item.item_id] = {\"data\": firestoreDoc};\n\
+  \  }\n}\n\n// Inject our products into the event data.\nmock(\"getEventData\", (data)\
+  \ => {\n  if (data === \"items\") {\n    return purchasedProducts;\n  }\n});\n\n\
+  // Change Firestore to return our mocked docs.\nmock(\"Firestore\", () => {\n  return\
+  \ {\n    \"read\": (path, options) => {\n      const sku = path.replace(collectionId\
+  \ + \"/\", \"\");\n      const doc = firestoreDocs[sku];     \n      return Promise.create((resolve)\
+  \ => {\n        resolve(doc);\n      });\n    }\n  };\n});\n"
 
 
 ___NOTES___
