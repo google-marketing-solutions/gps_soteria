@@ -14,6 +14,9 @@ determined user.
 Watch [our video on YouTube](https://youtube.com/watch?v=wCJ7XvKs_Ak) for more
 information.
 
+> Tip 💡: Check out [the sGTM Pantheon](
+    https://github.com/google-marketing-solutions/gps-sgtm-pantheon/tree/main)
+for more tags for different use-cases.
 
 ![Demo gif](./docs/img/demo.gif)
 
