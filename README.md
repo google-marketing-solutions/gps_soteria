@@ -14,6 +14,9 @@ determined user.
 Watch [our video on YouTube](https://youtube.com/watch?v=wCJ7XvKs_Ak) for more
 information.
 
+> Tip 💡: Check out [the sGTM Pantheon](
+    https://github.com/google-marketing-solutions/gps-sgtm-pantheon/tree/main)
+for more tags for different use-cases.
 
 ![Demo gif](./docs/img/demo.gif)
 
@@ -46,7 +49,7 @@ profit).
 
 ## Implementation
 Ready to start implementing this solution? You can follow the
-[full guide here](./docs/GUIDE.md) that outlines how Server Side Google Tag
+[full guide here](./docs/README.md) that outlines how Server Side Google Tag
 Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
 (or other sensitive data) and report it to Google Analytics, Google Ads or
 Floodlights in place of revenue as the conversion value.
