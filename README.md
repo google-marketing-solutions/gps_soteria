@@ -49,7 +49,7 @@ profit).
 
 ## Implementation
 Ready to start implementing this solution? You can follow the
-[full guide here](./docs/GUIDE.md) that outlines how Server Side Google Tag
+[full guide here](./docs/README.md) that outlines how Server Side Google Tag
 Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
 (or other sensitive data) and report it to Google Analytics, Google Ads or
 Floodlights in place of revenue as the conversion value.
