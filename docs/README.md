@@ -307,25 +307,39 @@ This service account needs to have permission to access the Firestore data.
 10. Save and deploy the code.
 
 
-## Advanced Use-cases
+## Value Calculation
 
-### Combine Return Rate with Profit
+There are different methods for calculating the value built into the tag.
 
-If some products are returned more than others, you could calculate the return
-rate percentage at a product level.
+- `Value`: This is the default method. The calculation is simply:
+  ```
+  conversion_value = profit * quantity
+  ```
+- `Return Rate`: If some products are returned more than others, you could
+  calculate the return rate percentage at a product level.
 
-Then in Firestore you can add the document with both the profit and return rate:
+  Then in Firestore you can add the document with both the profit and return
+  rate:
 
-![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
+  ![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
 
-And use the [firestore-value-return-rate-template.tpl](
-./../src/gtm/firestore-value-return-rate-template.tpl) to factor in both these
-values when calculating the conversion value. The template performs the
-following calculation for each product:
+  ```
+  conversion_value = (1 - return_rate) * profit * quantity
+  ```
+  If you select this field, you can optionally override the name of the return
+  rate field in Firestore.
+- `Value with Discount`: Discounts could impact your profit value, and these might
+  be applied at a transaction level. If you use [the discount](
+  https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase)
+  attribute in the items array, you could use this calculation method:
+  ```
+  conversion_value = (profit - discount) * quantity;
+  ```
 
-```
-conversion_value = (1 - return_rate) * profit * quantity
-```
+> Tip 💡: If you would like to write your own value calculation, you can do that
+by adding an additional option to the dropdown after importing the tag in tag
+manager, and by extending the switch statement in the `calculateValue()` method
+to handle your custom approach.
 
 ### Using AI in place of Firestore
 
@@ -335,7 +349,7 @@ https://github.com/google/gps-phoebe).
 
 ## Disclaimer
 
-Copyright 2022 Google LLC. This solution, including any related sample code or
+Copyright 2024 Google LLC. This solution, including any related sample code or
 data, is made available on an “as is,” “as available,” and “with all faults”
 basis, solely for illustrative purposes, and without warranty or representation
 of any kind. This solution is experimental, unsupported and provided solely for
