@@ -183,8 +183,8 @@ purchase event is configured. This follows the
 ### GTM Web Container
 
 There is nothing special about the Google Tag Manager web container set up. In
-this demo, a GA4 configuration is set up to send events to our server container,
-see [image 4](#image-4).
+this demo, a Google Tag is set up to send events to our server container, see
+[image 4](#image-4).
 
 ![image4.png](./img/image4.png)
 
