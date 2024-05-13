@@ -325,10 +325,10 @@ There are different methods for calculating the value built into the tag.
   ```
   conversion_value = (1 - return_rate) * profit * quantity
   ```
-  If you select this field, you can optionally override the name of the return
+  If you select this option, you can optionally override the name of the return
   rate field in Firestore.
-- `Value with Discount`: Discounts could impact your profit value, and these might
-  be applied at a transaction level. If you use [the discount](
+- `Value with Discount`: Discounts could impact your profit value, and these
+  might be applied at a transaction level. If you use [the discount](
   https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase)
   attribute in the items array, you could use this calculation method:
   ```
