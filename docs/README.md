@@ -294,13 +294,16 @@ This service account needs to have permission to access the Firestore data.
 8. Go to tags -> new:
     - **Google Analytics:** Select an Analytics tag and in the “parameters to
     add / edit” section replace value with the profit variable.
+
     ![Google Analytics Tag](./img/gtm-google-analytics-tag.png)
     - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the
     configuration add the profit variable to the 'Conversion Value' field.
+
     ![Google Ads Tag](./img/gtm-google-ads-tag.png)
     - **Floodlight:** Select a Floodlight tag and in the configuration, set
     'Custom configuration' as the 'Data Source' and add the profit variable to
     the 'Revenue' field.
+
     ![Google Ads Tag](./img/gtm-floodlight-tag.png)
 9. The trigger should be a custom event for purchase events.
 10. Save and deploy the code.
