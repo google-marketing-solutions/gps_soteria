@@ -16,8 +16,7 @@
     - [Set up](#set-up)
       - [Auth](#auth)
       - [Google Tag Manager](#google-tag-manager)
-- [Advanced Use-cases](#advanced-use-cases)
-  - [Combine Return Rate with Profit](#combine-return-rate-with-profit)
+- [Value Calculation](#value-calculation)
   - [Using AI in place of Firestore](#using-ai-in-place-of-firestore)
 - [Disclaimer](#disclaimer)
 
@@ -184,8 +183,8 @@ purchase event is configured. This follows the
 ### GTM Web Container
 
 There is nothing special about the Google Tag Manager web container set up. In
-this demo, a GA4 configuration is set up to send events to our server container,
-see [image 4](#image-4).
+this demo, a Google Tag is set up to send events to our server container, see
+[image 4](#image-4).
 
 ![image4.png](./img/image4.png)
 
@@ -295,37 +294,56 @@ This service account needs to have permission to access the Firestore data.
 8. Go to tags -> new:
     - **Google Analytics:** Select an Analytics tag and in the “parameters to
     add / edit” section replace value with the profit variable.
+
     ![Google Analytics Tag](./img/gtm-google-analytics-tag.png)
     - **Google Ads:** Select a Google Ads Conversion Tracking tag and in the
     configuration add the profit variable to the 'Conversion Value' field.
+
     ![Google Ads Tag](./img/gtm-google-ads-tag.png)
     - **Floodlight:** Select a Floodlight tag and in the configuration, set
     'Custom configuration' as the 'Data Source' and add the profit variable to
     the 'Revenue' field.
+
     ![Google Ads Tag](./img/gtm-floodlight-tag.png)
 9. The trigger should be a custom event for purchase events.
 10. Save and deploy the code.
 
 
-## Advanced Use-cases
+## Value Calculation
 
-### Combine Return Rate with Profit
+There are different methods for calculating the value built into the tag.
 
-If some products are returned more than others, you could calculate the return
-rate percentage at a product level.
+- `Value`: This is the default method. The calculation is simply:
+  ```
+  conversion_value = profit * quantity
+  ```
+- `Return Rate`: If some products are returned more than others, you could
+  calculate the return rate percentage at a product level.
 
-Then in Firestore you can add the document with both the profit and return rate:
+  Then in Firestore you can add the document with both the profit and return
+  rate:
 
-![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
+  ![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
 
-And use the [firestore-value-return-rate-template.tpl](
-./../src/gtm/firestore-value-return-rate-template.tpl) to factor in both these
-values when calculating the conversion value. The template performs the
-following calculation for each product:
+  ```
+  conversion_value = (1 - return_rate) * profit * quantity
+  ```
+  If you select this option, you can optionally override the name of the return
+  rate field in Firestore.
+- `Value with Discount`: Discounts could impact your profit value, and these
+  might be applied at a transaction level. If you use [the discount](
+  https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase)
+  attribute in the items array, you could use this calculation method:
+  ```
+  conversion_value = (profit - discount) * quantity;
+  ```
 
-```
-conversion_value = (1 - return_rate) * profit * quantity
-```
+> Tip 💡: If you would like to write your own value calculation, you can do that
+by adding an additional option to [the dropdown](
+../src/gtm/firestore-value-template.tpl#L50) after importing the tag in tag
+manager, and by extending the switch statement in the [`calculateValue()`](
+../src/gtm/firestore-value-template.tpl#L185) method to handle your custom
+approach.
 
 ### Using AI in place of Firestore
 
@@ -335,7 +353,7 @@ https://github.com/google/gps-phoebe).
 
 ## Disclaimer
 
-Copyright 2022 Google LLC. This solution, including any related sample code or
+Copyright 2024 Google LLC. This solution, including any related sample code or
 data, is made available on an “as is,” “as available,” and “with all faults”
 basis, solely for illustrative purposes, and without warranty or representation
 of any kind. This solution is experimental, unsupported and provided solely for

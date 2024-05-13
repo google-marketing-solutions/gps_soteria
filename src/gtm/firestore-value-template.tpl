@@ -27,6 +27,14 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "TEXT",
+    "name": "collectionId",
+    "displayName": "Firestore Collection ID",
+    "simpleValueType": true,
+    "defaultValue": "products",
+    "help": "The collection in Firestore that contains the products"
+  },
+  {
+    "type": "TEXT",
     "name": "valueField",
     "displayName": "Value Field",
     "simpleValueType": true,
@@ -35,12 +43,43 @@ ___TEMPLATE_PARAMETERS___
     "notSetText": "Please set the Firestore document field for value data"
   },
   {
-    "type": "TEXT",
-    "name": "collectionId",
-    "displayName": "Firestore Collection ID",
+    "type": "SELECT",
+    "name": "valueCalculation",
+    "displayName": "Value Calculation",
+    "macrosInSelect": false,
+    "selectItems": [
+      {
+        "value": "valueQuantity",
+        "displayValue": "Value"
+      },
+      {
+        "value": "returnRate",
+        "displayValue": "Return Rate"
+      },
+      {
+        "value": "valueWithDiscount",
+        "displayValue": "Value with Discount"
+      }
+    ],
     "simpleValueType": true,
-    "defaultValue": "products",
-    "help": "The collection in Firestore that contains the products"
+    "defaultValue": "valueQuantity",
+    "help": "How to calculate the value for each item.\nSee this page for more information: https://github.com/google-marketing-solutions/gps_soteria/tree/main/docs#value-calculation"
+  },
+  {
+    "type": "TEXT",
+    "name": "returnRateField",
+    "displayName": "Return Rate Field",
+    "simpleValueType": true,
+    "enablingConditions": [
+      {
+        "paramName": "valueCalculation",
+        "paramValue": "returnRate",
+        "type": "EQUALS"
+      }
+    ],
+    "help": "Field in the Firestore Document that holds the return rate data for the item",
+    "defaultValue": "return_rate",
+    "notSetText": "Please set the Firestore document field for return rate data"
   },
   {
     "type": "CHECKBOX",
@@ -56,7 +95,7 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,7 +114,7 @@ ___SANDBOXED_JS_FOR_SERVER___
  * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
  * new conversion value based on items in the datalayer.
  * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
- * @version 1.0.3
+ * @version 2.0.0
  */
 
 const Firestore = require("Firestore");
@@ -84,6 +123,7 @@ const getEventData = require("getEventData");
 const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
 const makeString = require("makeString");
+const Math = require("Math");
 const getType = require("getType");
 
 
@@ -137,6 +177,39 @@ function getDefaultValue(item) {
 }
 
 /**
+ * Calculate the value based on the configuration.
+ * @param {!Object} item an item from the datalayer.
+ * @param {!Object} fsDocument a Firestore document.
+ * @returns {number} the value to use in the calculation.
+ */
+function calculateValue(item, fsDocument) {
+  let value;
+
+  const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
+  const documentValue = makeNumber(fsDocument.data[data.valueField]);
+
+  switch (data.valueCalculation) {
+    case "valueQuantity":
+      value = documentValue * makeNumber(quantity);
+      break;
+
+    case "returnRate":
+      const returnRate = makeNumber(fsDocument.data[data.returnRateField]);
+      value = (1 - returnRate) * documentValue * quantity;
+      // To address hitting issues with floating point precision round the
+      // number to 2 decimal places.
+      value = Math.round(value * 100) / 100;
+      break;
+
+    case "valueWithDiscount":
+      const discount = item.hasOwnProperty("discount") ? item.discount : 0;
+      value = (documentValue - discount) * quantity;
+      break;
+  }
+  return value;
+}
+
+/**
  * Use Firestore to determine what the new value should be for this item.
  * @param {!Object} item - an item from the datalayer that is expected to follow
  * this schema:
@@ -165,25 +238,16 @@ function getFirestoreValue(item) {
 
   return Promise.create((resolve) => {
     return firestore.read(path, { projectId: data.gcpProjectId })
-    .then((result) => {
-      if (result.data.hasOwnProperty(data.valueField)) {
-        const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
-        value = makeNumber(result.data[data.valueField]) * makeNumber(quantity);
-      } else {
+      .then((fsDocument) => {
+        value = calculateValue(item, fsDocument, value);
+      })
+      .catch((error) => {
         logToConsole(
-          "Firestore document " +
-            item.item_id +
-            " doesn't have a field " +
-            data.valueField
-        );
-      }
-    })
-    .catch((error) => {
-      logToConsole("Error retrieving Firestore document `" + path + "`", error);
-    })
-    .finally(() => {
-      resolve(value);
-    });
+          "Error retrieving Firestore document `" + path + "`", error);
+      })
+      .finally(() => {
+        resolve(value);
+      });
   });
 }
 
@@ -301,86 +365,201 @@ ___SERVER_PERMISSIONS___
 ___TESTS___
 
 scenarios:
-- name: Test simple profit calculation
+- name: Test collectionID used in request to Firestore
   code: |
-    generateMockData([
-      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2},
-      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1},
+    const mockData = {
+      collectionId: "test-products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 2, "price": 50}
     ]);
 
-    runCode(mockVariableData).then((resp) => {
-      assertThat(resp).isString();
-      assertThat(resp).isEqualTo("20");
+    mock("Firestore", () => {
+      return {
+        "read": (path, options) => {
+          assertThat(path).isEqualTo("test-products/sku1");
+          return Promise.create((resolve) => {
+            resolve({"data": {"profit": 100}});
+          });
+        }
+      };
     });
-- name: Test missing document with one item
+
+    runCode(mockData);
+- name: Test valueField used when parsing value from Firestore
   code: |
-    // Generate only the mocked items, not the Firestore docs.
-    generateMockItems([
-      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2},
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
     ]);
 
-    runCode(mockVariableData).then((resp) => {
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("100");
+    });
+- name: Test valueCalculation for valueQuantity
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 2, "price": 150},
+      {"item_id": "sku2", "quantity": 1, "price": 50},
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}},
+      "sku2": {"data": {"profit": 10}}
+    });
+
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("210");
+    });
+- name: Test valueCalculation for returnRate
+  code: |
+    const mockData = {
+      collectionId: "products",
+      returnRateField: "return_rate",
+      valueCalculation: "returnRate",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 2, "price": 150},
+      {"item_id": "sku2", "quantity": 1, "price": 50},
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100, "return_rate": 0.5}},
+      "sku2": {"data": {"profit": 10, "return_rate": 0.25}}
+    });
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("107.5");
+    });
+- name: Test valueCalculation for valueWithDiscount
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueWithDiscount",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 2, "price": 150, "discount": 20},
+      {"item_id": "sku2", "quantity": 1, "price": 50},
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}},
+      "sku2": {"data": {"profit": 10}}
+    });
+
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("170");
+    });
+- name: Test zeroIfNotFound is true
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      zeroIfNotFound: true,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku2": {"data": {"profit": 100}}
+    });
+
+
+    runCode(mockData).then((resp) => {
       assertThat(resp).isString();
       assertThat(resp).isEqualTo("0");
     });
-- name: Test partially missing conversion
-  code: |
-    // Generate only the mocked items, not the Firestore docs.
-    generateMockItems([
-      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2},
-      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1},
+- name: Test zeroIfNotFound is false
+  code: |-
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      zeroIfNotFound: false,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
     ]);
 
-    // Add only one of the docs to Firestore mock.
-    generateMockFirestoreDocs([
-      {"item_id": "sku2", "revenue": 15, "profit": 5, "quantity": 1},
-    ]);
-
-    runCode(mockVariableData).then((resp) => {
-      assertThat(resp).isString();
-      assertThat(resp).isEqualTo("5");
+    addMockFirestore({
+      "sku2": {"data": {"profit": 100}}
     });
-- name: Test fall back to revenue
-  code: |
-    // Generate only the mocked items, not the Firestore docs.
-    generateMockItems([
-      {"item_id": "sku1", "revenue": 10, "profit": 7.5, "quantity": 2},
-    ]);
 
-    // Override the variable to default to revenue.
-    mockVariableData.zeroIfNotFound = false;
 
-    runCode(mockVariableData).then((resp) => {
+    runCode(mockData).then((resp) => {
       assertThat(resp).isString();
-      assertThat(resp).isEqualTo("20");
+      assertThat(resp).isEqualTo("150");
     });
-setup: "const Promise = require(\"Promise\");\n\n\n// You can override these variables\
-  \ in individual tests\nconst collectionId = \"products\";\nconst valueField = \"\
-  profit\";\n// Mock the variable fields\nconst mockVariableData = {\n  \"valueField\"\
-  : valueField,\n  \"zeroIfNotFound\": true,\n  \"collectionId\": collectionId\n};\n\
-  const purchasedProducts = [];\nconst firestoreDocs = {};\n\n/**\n * Build the mock\
-  \ data from the items.\n * This method changes the global purchasedProducts & firestoreDocs\
-  \ variables,\n * which are then used in the mock logic.\n * @param {!Array<number>}\
-  \ items - the items to mock.\n */\nfunction generateMockData(items) {\n  generateMockItems(items);\n\
-  \  generateMockFirestoreDocs(items);\n}\n\n/**\n * Build the mock items from the\
-  \ purchase event.\n * This method changes the global purchasedProducts variable,\
-  \ which is used in\n * the mock logic.\n * @param {!Array<number>} items - the items\
-  \ to mock.\n */\nfunction generateMockItems(items) {\n  for (const item of items)\
-  \ {\n    purchasedProducts.push({\n      \"item_id\": item.item_id,\n      \"price\"\
-  : item.revenue,\n      \"quantity\": item.quantity\n    });\n  }\n}\n\n/**\n * Build\
-  \ the mock Firestore documents from the items.\n * This method changes the global\
-  \ firestoreDocs variable, which is used in the\n * mock logic.\n * @param {!Array<number>}\
-  \ items - the items to mock.\n */\nfunction generateMockFirestoreDocs(items) {\n\
-  \  for (const item of items) {\n    // This two step approach is to set a variable\
-  \ as a key in JS, the []\n    // approach doesn't work. See:\n    // https://stackoverflow.com/questions/11508463/javascript-set-object-key-by-variable\n\
-  \    const firestoreDoc = {};\n    firestoreDoc[valueField] = item.profit;\n   \
-  \ firestoreDocs[item.item_id] = {\"data\": firestoreDoc};\n  }\n}\n\n// Inject our\
-  \ products into the event data.\nmock(\"getEventData\", (data) => {\n  if (data\
-  \ === \"items\") {\n    return purchasedProducts;\n  }\n});\n\n// Change Firestore\
-  \ to return our mocked docs.\nmock(\"Firestore\", () => {\n  return {\n    \"read\"\
-  : (path, options) => {\n      const sku = path.replace(collectionId + \"/\", \"\"\
-  );\n      const doc = firestoreDocs[sku];     \n      return Promise.create((resolve)\
-  \ => {\n        resolve(doc);\n      });\n    }\n  };\n});\n"
+setup: |-
+  const Promise = require("Promise");
+
+  /**
+   * Add mock getEventData to the test.
+   * @param {!Array<!Object>} items an array of items from the datalayer.
+   */
+  function addMockEventData(items){
+    mock("getEventData", (data) => {
+      if (data === "items") {
+        return items;
+      }
+    });
+  }
+
+  /**
+   * Add mock Firestore library to the test.
+   * @param {!Object} firestoreDocs an object representing the firestore response.
+   */
+  function addMockFirestore(firestoreDocs){
+    mock("Firestore", () => {
+      return {
+        "read": (path, options) => {
+          const sku = path.replace(mockData.collectionId + "/", "");
+          const doc = firestoreDocs[sku];
+          return Promise.create((resolve) => {
+            resolve(doc);
+          });
+        }
+      };
+    });
+  }
 
 
 ___NOTES___
