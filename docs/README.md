@@ -336,9 +336,11 @@ There are different methods for calculating the value built into the tag.
   ```
 
 > Tip 💡: If you would like to write your own value calculation, you can do that
-by adding an additional option to the dropdown after importing the tag in tag
-manager, and by extending the switch statement in the `calculateValue()` method
-to handle your custom approach.
+by adding an additional option to [the dropdown](
+../src/gtm/firestore-value-template.tpl#L50) after importing the tag in tag
+manager, and by extending the switch statement in the [`calculateValue()`](
+../src/gtm/firestore-value-template.tpl#L185) method to handle your custom
+approach.
 
 ### Using AI in place of Firestore
 
