@@ -207,6 +207,12 @@ mode, then you'll have to create a new project and store profit data for each
 product in a Firestore document
 ([read more](https://cloud.google.com/datastore/docs/firestore-or-datastore)).
 
+> Important ❗: [the Firestore API in sGTM](
+  https://developers.google.com/tag-platform/tag-manager/server-side/api#firestoreread)
+  currently only supports working with [the default database](
+  https://firebase.google.com/docs/firestore/manage-databases#the_default_database).
+  Ensure that your collection and documents sit within this default database.
+
 The recommended way is to set each Firestore document ID to the product ID, this
 way it's easy to fetch the right document by a single lookup.
 
