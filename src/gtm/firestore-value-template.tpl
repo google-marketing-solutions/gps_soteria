@@ -320,7 +320,7 @@ ___SERVER_PERMISSIONS___
                   },
                   {
                     "type": 1,
-                    "string": "products/*"
+                    "string": "*"
                   },
                   {
                     "type": 1,
