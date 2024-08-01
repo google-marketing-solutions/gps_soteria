@@ -54,6 +54,13 @@ Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
 (or other sensitive data) and report it to Google Analytics, Google Ads or
 Floodlights in place of revenue as the conversion value.
 
+## Mobile App Conversions
+Server-side Google Tag Manager (sGTM) doesn't currently offer direct support for
+mobile apps, but it's still possible to implement value based bidding strategies
+for your app, even with sensitive conversion values like profit.
+
+Read more about [mobile app conversions here](./docs/mobile-apps.md).
+
 ## Disclaimer
 __This is not an officially supported Google product.__
 
