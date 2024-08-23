@@ -82,13 +82,58 @@ ___TEMPLATE_PARAMETERS___
     "notSetText": "Please set the Firestore document field for return rate data"
   },
   {
-    "type": "CHECKBOX",
-    "name": "zeroIfNotFound",
-    "checkboxText": "Zero if not found",
-    "simpleValueType": true,
-    "defaultValue": true,
-    "help": "If true items that cannot be found in Firestore will be 0. If false items that cannot be found in Firestore will have their original value from the event data.",
-    "alwaysInSummary": true
+    "type": "GROUP",
+    "name": "fallback",
+    "displayName": "Fallback Value if Product Not Found",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
+      {
+        "type": "SELECT",
+        "name": "fallbackValueIfNotFound",
+        "displayName": "Fallback Value Calculation",
+        "macrosInSelect": false,
+        "selectItems": [
+          {
+            "value": "zero",
+            "displayValue": "Zero"
+          },
+          {
+            "value": "revenue",
+            "displayValue": "Revenue"
+          },
+          {
+            "value": "percent",
+            "displayValue": "Percent"
+          }
+        ],
+        "simpleValueType": true,
+        "help": "Set what the default should be if the product isn\u0027t found in Firestore.",
+        "defaultValue": "percent"
+      },
+      {
+        "type": "TEXT",
+        "name": "fallBackPercent",
+        "displayName": "Percentage",
+        "simpleValueType": true,
+        "defaultValue": 0.1,
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          },
+          {
+            "type": "DECIMAL"
+          }
+        ],
+        "help": "The percentage of the item price to use as the fallback value. This should be between 0 \u0026 1, so 10% \u003d 0.1.",
+        "enablingConditions": [
+          {
+            "paramName": "fallbackValueIfNotFound",
+            "paramValue": "percent",
+            "type": "EQUALS"
+          }
+        ]
+      }
+    ]
   }
 ]
 
@@ -114,7 +159,7 @@ ___SANDBOXED_JS_FOR_SERVER___
  * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
  * new conversion value based on items in the datalayer.
  * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 const Firestore = require("Firestore");
@@ -167,13 +212,28 @@ function getItemValues(items) {
  * @param {!Object} item - an item from the datalayer that is expected to follow
  * this schema:
  * https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item
- * @returns {number} will return 0 if zeroIfNotFound is True in the variable
- * config, otherwise it will return the revenue value.
+ * @returns {number} will return the default value based on the variable config.
  */
 function getDefaultValue(item) {
-  const itemPrice = data.zeroIfNotFound ? 0 : item.price;
+  let value;
   const quantity = item.hasOwnProperty("quantity") ? item.quantity : 1;
-  return makeNumber(itemPrice) * makeNumber(quantity);
+
+  switch (data.fallbackValueIfNotFound) {
+    case "zero":
+      value = 0;
+      break;
+
+    case "revenue":
+      value = makeNumber(item.price) * makeNumber(quantity);
+      break;
+
+    case "percent":
+      const percent = makeNumber(data.fallBackPercent);
+      value = makeNumber(item.price) * percent * makeNumber(quantity);
+      value = roundValue(value);
+      break;
+  }
+  return value;
 }
 
 /**
@@ -196,9 +256,7 @@ function calculateValue(item, fsDocument) {
     case "returnRate":
       const returnRate = makeNumber(fsDocument.data[data.returnRateField]);
       value = (1 - returnRate) * documentValue * quantity;
-      // To address hitting issues with floating point precision round the
-      // number to 2 decimal places.
-      value = Math.round(value * 100) / 100;
+      value = roundValue(value);
       break;
 
     case "valueWithDiscount":
@@ -207,6 +265,16 @@ function calculateValue(item, fsDocument) {
       break;
   }
   return value;
+}
+
+/**
+ * Round the value to 2 decimal places.
+ * To remove issues with floating point precision round the value.
+ * @param {number} value - the value to round
+ * @returns {number} the value rounded to 2 decimal places.
+ */
+function roundValue(value) {
+  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -371,7 +439,7 @@ scenarios:
       collectionId: "test-products",
       valueCalculation: "valueQuantity",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
     };
 
     addMockEventData([
@@ -396,7 +464,7 @@ scenarios:
       collectionId: "products",
       valueCalculation: "valueQuantity",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
     };
 
     addMockEventData([
@@ -418,7 +486,7 @@ scenarios:
       collectionId: "products",
       valueCalculation: "valueQuantity",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
     };
 
     addMockEventData([
@@ -443,7 +511,7 @@ scenarios:
       returnRateField: "return_rate",
       valueCalculation: "returnRate",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
     };
 
     addMockEventData([
@@ -466,7 +534,7 @@ scenarios:
       collectionId: "products",
       valueCalculation: "valueWithDiscount",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
     };
 
     addMockEventData([
@@ -484,13 +552,58 @@ scenarios:
       assertThat(resp).isString();
       assertThat(resp).isEqualTo("170");
     });
-- name: Test zeroIfNotFound is true
+- name: Test fallback percent
   code: |
     const mockData = {
       collectionId: "products",
       valueCalculation: "valueQuantity",
       valueField: "profit",
-      zeroIfNotFound: true,
+      fallbackValueIfNotFound: "percent",
+      fallBackPercent: 0.1,
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku2": {"data": {"profit": 100}}
+    });
+
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("15");
+    });
+- name: Test fallback revenue
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "revenue",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku2": {"data": {"profit": 100}}
+    });
+
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("150");
+    });
+- name: Test fallback zero
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "zero",
     };
 
     addMockEventData([
@@ -506,27 +619,28 @@ scenarios:
       assertThat(resp).isString();
       assertThat(resp).isEqualTo("0");
     });
-- name: Test zeroIfNotFound is false
-  code: |-
+- name: Test rounding to 2 decimal places with fallback value
+  code: |
     const mockData = {
       collectionId: "products",
       valueCalculation: "valueQuantity",
       valueField: "profit",
-      zeroIfNotFound: false,
+      fallbackValueIfNotFound: "percent",
+      fallBackPercent: 0.17,
     };
 
     addMockEventData([
-      {"item_id": "sku1", "quantity": 1, "price": 150}
+      {"item_id": "sku1", "quantity": 1, "price": 37.123456}
     ]);
 
     addMockFirestore({
-      "sku2": {"data": {"profit": 100}}
+      "sku2": {"data": {"profit": 10}}
     });
 
 
     runCode(mockData).then((resp) => {
       assertThat(resp).isString();
-      assertThat(resp).isEqualTo("150");
+      assertThat(resp).isEqualTo("6.31");
     });
 setup: |-
   const Promise = require("Promise");
