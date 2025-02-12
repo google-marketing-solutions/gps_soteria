@@ -1,44 +1,350 @@
-# Value Based Bidding for Mobile Apps (Pre-sGTM App Support)
+# gPS Soteria for Apps
+##  Value Based Bidding using Server Side Google Tag Manager & Firestore for Mobile Apps
 
-Server-side Google Tag Manager (sGTM) doesn't currently offer direct support for
-mobile apps, but it's still possible to implement value based bidding strategies
-for your app, even with sensitive conversion values like profit. This guide
-outlines how to achieve this using [Firebase](https://firebase.google.com/) and
-[Measurement Protocol](
-https://developers.google.com/analytics/devguides/collection/protocol/ga4).
-
-> ⚠️ This is a guide with a proposed architecture, not a deployable solution.
+- [Overview](#overview)
+- [Background](#background)
+- [Prerequisites](#prerequisites)
+- [Architecture](#architecture)
+- [Demo](#demo)
+- [Solution Details](#solution-details)
+  - [Mobile App](#mobile-app)
+  - [GTM App Container](#gtm-app-container)
+  - [Firestore](#firestore)
+  - [Server Side GTM](#server-side-gtm)
+    - [Overview](#overview-1)
+    - [Set up](#set-up)
+      - [Auth](#auth)
+      - [Google Tag Manager](#google-tag-manager)
+- [Value Calculation](#value-calculation)
+  - [Using AI in place of Firestore](#using-ai-in-place-of-firestore)
+- [Disclaimer](#disclaimer)
 
 ## Overview
-The core idea is to track purchase events in your app using the [Firebase SDK](
-https://firebase.google.com/docs/firestore/client/libraries), then send these
-transactions to an internal database. An ETL (Extract, Transform, Load) tool can
-then enrich this data with profit information. Finally, the Measurement Protocol
-is used to send these enriched conversions back to Firebase, enabling value
-based bidding.
+
+This document outlines how
+[Server Side Google Tag Manager for Mobile Apps](https://developers.google.com/tag-platform/tag-manager/server-side/server-side-tagging-for-mobile-apps)
+(sGTM) can be used with [Firestore](https://cloud.google.com/firestore), to pull
+in profit data and report it to Google Analytics in place of revenue as the conversion value. This enables
+advertisers to bid to profit with real time conversion uploads.
+
+![demo.gif](./img/demo-apps.gif)
+
+##### *Gif 1*
+
+_It should be noted in this demo that we’re changing the e-commerce event
+conversion value to the profit. If your intention is to use this with bidding,
+this is a reasonable approach, but be aware that Google Analytics will label the
+profit as “revenue” in the UI, if you’re using e-commerce events. The solution
+provides you with full control of where you report this, so you may need to
+consider which value you use if your goal is to leverage Soteria for reporting
+purposes._
+
+## Background
+
+Value Based Bidding (VBB) is one of the core topics for many clients. There are
+different levels of maturity with VBB: clients tend to start with a revenue
+value, and implement
+[tROAS bidding](https://support.google.com/google-ads/answer/6268637?hl=en-GB),
+but as they mature they will move to using a profit or LifeTime Value (LTV) in
+place of revenue.
+
+Both profit and LTV are sensitive metrics, therefore most clients would not like
+a determined user to be able to access this information. As a result, clients
+will tend to either use a proxy value in its place or implement a batch upload
+strategy using one of the APIs. The former complicates reporting and some
+clients are uncomfortable with this approach. The latter poses issues due to the
+lack of support for conversion modelling, and some worry about the impact on
+bidding, caused by the delay in reporting the conversions in batches.
+
+sGTM has feature parity for modelling with the client side SDK, it
+happens in real time, and enables pulling in external “sensitive” data, so it
+operates in the sweet spot between the two existing approaches.
+
+This document outlines how a client could use sGTM to replace revenue with
+profit, on a “purchase” event, and send it to Google Analytics, in a way that
+protects that sensitive data.
+
+## Prerequisites
+
+-   Server Side Google Tag Manager
+-   Access to a Google Cloud project with Firestore in
+    [Native mode](https://cloud.google.com/datastore/docs/firestore-or-datastore)
+-   Access to product level profit data in advance of a transaction
+-   Google Analytics or Google Ads for conversions
 
 ## Architecture
-The below architecture diagram looks at the mobile conversion pipeline in
-isolation.
 
-![Architecture diagram of app conversion flow](./img/app-mp-conversion-flow.png)
+[Image 1](#image-1) provides a high level overview of the core components
+involved, and outlines the flow. This is high level, please see
+[solution details](#solution-details) for further information.
 
-1. **Track Purchases:** Implement Firebase Analytics in your app to track
-  purchase events, including revenue information.
-2. **Store Transactions:** Send the transaction data to an internal database
-  where you can securely store and manage it.
-3. **Enrich with Profit:** Use an ETL tool (e.g. [Dataflow](
-  https://cloud.google.com/dataflow)) to join your transaction data with profit
-  data from your internal systems.
-4. **Report to Firebase:** Use [Measurement Protocol](
-  https://developers.google.com/analytics/devguides/collection/protocol/ga4) to
-  send the enriched conversion data (including profit) back to Firebase ([also
-  see this colab](https://firebase.google.com/codelabs/firebase_mp#0)).
+![image1.png](./img/image1_apps.png)
 
-> Important ❗️: The specific ETL tool and database will depend on your existing
-> tech stack and infrastructure.
+##### *Image 1*
 
-For a unified view of both the web and app flow, see below. The data flow is the
-same as the regular Soteria data flow for web, and the above app flow.
+<br>
 
-![Unified web & app architecture diagram](./img/unified-web-app-mp-flow.png)
+1.  A GTM app container is used to set up tagging within the mobile app, and is configured
+    with an “in_app_purchase” event.
+2.  The client’s mobile app is set up to have an
+    [e-commerce purchase event](https://firebase.google.com/docs/analytics/measure-ecommerce)
+    in the data layer: this contains the revenue data. When a purchase is made,
+    the event fires, sending the payload to sGTM.
+3.  A custom variable is attached to a tag, triggered by “in_app_purchase” events,
+    which pulls profit data from Firestore and replaces the revenue conversion
+    value with the profit.
+4.  The updated event (with profit conversion value) is sent to Google
+    Analytics for Firebase or Google Ads.
+
+## Demo
+
+As seen in [gif 1](#gif-1), on a demo app there are three products a user
+can purchase. These can be seen below in table 1, along with the average profit
+for each of the items.
+
+The revenue value is displayed to the user, and the average profit for each of
+these items is stored in a separate document in a Firestore collection.
+
+| Product | Revenue | Profit |
+|   :-:   |   :-:   |   :-:  |
+|  Blazer  |    $149.99   |    $72.3  |
+|  Shoes  |   $79.99   |   $28.5  |
+|  T-Shirt  |   $30.99   |   $14.5  |
+
+##### *Table 1*
+
+<br>
+
+On our demo app, after purchasing a pair of socks this is what we can see in
+the event JSON: ![image2.png](./img/image2-apps.png)
+
+##### *Image 2*
+
+<br>
+
+In the data layer we can see a `purchase` event, with a transaction ID of
+`c1 d2fb77-297d-4e`, the total basket value is 149.99 and the item
+price is 149.99. This is all a determined user would be able to see.
+
+In our Google Tag Manager server container, we have a custom variable that swaps
+the basket revenue value for the profit, and reports the data to Google
+Analytics.
+
+In the Firebase DebugView, we can see that the item revenue is unchanged at $149.99.
+However, we've replaced the basket value with the profit of $72.3.
+
+![image3.png](./img/image3-apps.png)
+
+##### *Image 3*
+
+<br>
+
+We can then configure Google Analytics to use the basket value as a conversion,
+which can be imported into an ad product and used in bidding. Thus, enabling
+profit bidding without the profit value ever being on the device for a user to
+see.
+
+## Solution Details
+
+### Mobile App
+
+In the app’s code, on the “thank you for your order” screen, an
+in_app_purchase event is configured. This follows the
+[schema outlined in the docs](https://firebase.google.com/docs/analytics/measure-ecommerce#make_purchase_refund).
+
+```java
+// Example Android Code
+Bundle purchaseParams = new Bundle();
+purchaseParams.putString(FirebaseAnalytics.Param.TRANSACTION_ID, "T12345");
+purchaseParams.putString(FirebaseAnalytics.Param.AFFILIATION, "Google Store");
+purchaseParams.putString(FirebaseAnalytics.Param.CURRENCY, "USD");
+purchaseParams.putDouble(FirebaseAnalytics.Param.VALUE, 14.98);
+purchaseParams.putDouble(FirebaseAnalytics.Param.TAX, 2.58);
+purchaseParams.putDouble(FirebaseAnalytics.Param.SHIPPING, 5.34);
+purchaseParams.putString(FirebaseAnalytics.Param.COUPON, "SUMMER_FUN");
+purchaseParams.putParcelableArray(FirebaseAnalytics.Param.ITEMS,
+new Parcelable[]{itemJeggingsCart});
+
+mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.PURCHASE, purchaseParams);
+```
+
+##### *Code 1*
+
+<br>
+
+### GTM App Container
+
+There is nothing special about the Google Tag Manager app container setup. In this demo, a Google Analytics for Firebase tag is set up to send events to our server container, see
+[image 4](#image-4).
+
+![image4.png](./img/image4-apps.png)
+
+##### *Image 4*
+
+<br>
+
+A purchase_profit event is then configured, see [image 5](#image-5).
+
+![image5](./img/image5-apps.png)
+
+##### *Image 5*
+
+<br>
+
+### Firestore
+
+There is a requirement to use Firestore Native, if you've already used Datastore
+mode, then you'll have to create a new project and store profit data for each
+product in a Firestore document
+([read more](https://cloud.google.com/datastore/docs/firestore-or-datastore)).
+
+> Important ❗: [the Firestore API in sGTM](
+https://developers.google.com/tag-platform/tag-manager/server-side/api#firestoreread)
+currently only supports working with [the default database](
+https://firebase.google.com/docs/firestore/manage-databases#the_default_database).
+Ensure that your collection and documents sit within this default database.
+
+The recommended way is to set each Firestore document ID to the product ID, this
+way it's easy to fetch the right document by a single lookup.
+
+First create a `products` collection, then add documents to this collection for
+each product. These documents should have a field with the profit value.
+
+The Firestore collection name, and document field can be set when setting up the
+variable in sGTM.
+
+![image6](./img/image6.png)
+
+##### *Image 6*
+
+<br>
+
+### Server Side GTM
+
+#### Overview
+
+This is where the magic happens: the data sent from the app (see
+[code 1](#code-1) and/or [image 2](#image-2)) contains the revenue value. In the
+server side container the revenue value is swapped for the profit value, which
+is pulled from Firestore, by using a custom
+“[profit variable template](./../src/gtm/firestore-value-template.tpl)”.
+
+An overview of the sGTM flow can be seen below.
+
+![Architecture Diagram Analytics](
+./img/architecture-diagram-google-analytics-apps.png)
+
+1.  The purchase event triggers the Analytics tag.
+2.  The tag has a custom profit variable attached to it to replace the
+    conversion value.
+3.  The profit variable uses a custom variable template
+    ([see code](./../src/gtm/firestore-value-template.tpl)) to fetch the profit
+    data from Firestore and sum the total profit for all purchased items.
+4.  The event is reported to Google Analytics with the updated conversion value.
+
+#### Set up
+
+##### Auth
+
+If the server side container is deployed to App Engine or Cloud Run, then Google
+Tag Manager will use the service account attached to the instance for connecting
+to Firestore.
+
+If the server side container is deployed in a different Cloud provider to Google
+Cloud, please [follow these additional instructions](
+https://developers.google.com/tag-platform/tag-manager/server-side/manual-setup-guide#optional_include_google_cloud_credentials)
+to attach a Google Cloud service account to the deployment.
+
+This service account needs to have permission to access the Firestore data.
+
+1. Open the [IAM Service Accounts page](
+   https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google
+   project that contains the sGTM container, and make a note of the service
+   account email.
+   ![Service account email](./img/auth-sgtm-service-account.png)
+2. Open the [IAM page](https://console.cloud.google.com/iam-admin/iam) for the
+   Firestore project, and press grant access.
+   ![Firestore project grant IAM access](./img/auth-firestore-iam.png)
+3. Add the service account email from step 1, and assign it the `Cloud Datastore
+   User` role ([docs](
+   https://cloud.google.com/iam/docs/understanding-roles#datastore-roles)).
+   ![IAM permissions](./img/auth-iam-permissions.png)
+
+
+##### Google Tag Manager
+
+1. Go to the server side container in
+   [tagmanager.google.com](https://tagmanager.google.com/).
+2. Go to templates -> new variable template.
+3. Click on the three-dot menu on the top right and choose `Import`.
+4. Select the [`firestore-value-template.tpl`](
+   ./../src/gtm/firestore-value-template.tpl) file.
+5. Go to the permission tab and set the permissions for Firestore, ensuring you
+   update the project ID.
+   ![Template permissions](./img/gtm-template-permissions.png)
+6. Save the template.
+7. Go to variables -> new user defined variable and create a “profit” variable
+   from the profit variable template.
+8. Go to tags -> new:
+- **Google Analytics:** Select an Analytics tag and in the “parameters to
+  add / edit” section replace value with the profit variable.
+
+![Google Analytics Tag](./img/gtm-google-analytics-tag-apps.png)
+
+## Value Calculation
+
+There are different methods for calculating the value built into the tag.
+
+- `Value`: This is the default method. The calculation is simply:
+  ```
+  conversion_value = profit * quantity
+  ```
+- `Return Rate`: If some products are returned more than others, you could
+  calculate the return rate percentage at a product level.
+
+  Then in Firestore you can add the document with both the profit and return
+  rate:
+
+  ![Firestore screenshot with return rate](./img/firestore-with-return-rate.png)
+
+  ```
+  conversion_value = (1 - return_rate) * profit * quantity
+  ```
+  If you select this option, you can optionally override the name of the return
+  rate field in Firestore.
+- `Value with Discount`: Discounts could impact your profit value, and these
+  might be applied at a transaction level. If you use [the discount](
+  https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase)
+  attribute in the items array, you could use this calculation method:
+  ```
+  conversion_value = (profit - discount) * quantity;
+  ```
+
+> Tip 💡: If you would like to write your own value calculation, you can do that
+by adding an additional option to [the dropdown](
+../src/gtm/firestore-value-template.tpl#L50) after importing the tag in tag
+manager, and by extending the switch statement in the [`calculateValue()`](
+../src/gtm/firestore-value-template.tpl#L185) method to handle your custom
+approach.
+
+### Using AI in place of Firestore
+
+If you're interested in leveraging an AI model instead of static lookups in
+Firestore, then consider the [Phoebe solution on Github](
+https://github.com/google/gps-phoebe).
+
+## Disclaimer
+
+Copyright 2024 Google LLC. This solution, including any related sample code or
+data, is made available on an “as is,” “as available,” and “with all faults”
+basis, solely for illustrative purposes, and without warranty or representation
+of any kind. This solution is experimental, unsupported and provided solely for
+your convenience. Your use of it is subject to your agreements with Google, as
+applicable, and may constitute a beta feature as defined under those agreements.
+To the extent that you make any data available to Google in connection with your
+use of the solution, you represent and warrant that you have all necessary and
+appropriate rights, consents and permissions to permit Google to use and process
+that data. By using any portion of this solution, you acknowledge, assume and
+accept all risks, known and unknown, associated with its usage, including with
+respect to your deployment of any portion of this solution in your systems, or
+usage in connection with your business, if at all.

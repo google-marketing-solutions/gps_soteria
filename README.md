@@ -18,27 +18,12 @@ information.
     https://github.com/google-marketing-solutions/gps-sgtm-pantheon/tree/main)
 for more tags for different use-cases.
 
-![Demo gif](./docs/img/demo.gif)
-
 ## Background
-Value Based Bidding (VBB) is one of the core topics for many clients. There are
-different levels of maturity with VBB: clients tend to start with a revenue
-value, and implement [tROAS bidding](
-https://support.google.com/google-ads/answer/6268637?hl=en-GB), but as they
-mature they will move to using a profit or LifeTime Value (LTV) in place of
-revenue.
+Value Based Bidding (VBB) is a core topic for many clients across web and app platforms. There are different levels of maturity with VBB: clients tend to start with a revenue value, and implement [tROAS bidding](https://support.google.com/google-ads/answer/6268637?hl=en), but as they mature they will move to using a profit or LifeTime Value (LTV) in place of revenue.
 
-Both profit and LTV are sensitive metrics, therefore most clients would not like
-a determined user to be able to access this information. As a result, clients
-will tend to either use a proxy value in its place or implement a batch upload
-strategy using one of the APIs. The former complicates reporting and some
-clients are uncomfortable with this approach. The latter poses issues due to the
-lack of support for conversion modelling, and some worry about the impact on
-bidding, caused by the delay in reporting the conversions in batches.
+Both profit and LTV are sensitive metrics, therefore most clients would not like a determined user to be able to access this information. As a result, clients will tend to either use a proxy value in its place or implement a batch upload strategy using one of the APIs. The former complicates reporting and some clients are uncomfortable with this approach. The latter poses issues due to the lack of support for conversion modelling, and some worry about the impact on bidding, caused by the delay in reporting the conversions in batches.
 
-sGTM has feature parity for modelling with the client side JavaScript tag, it
-happens in real time, and enables pulling in external "sensitive" data, so it
-operates in the sweet spot between the two existing approaches.
+sGTM has feature parity for modeling across web and app platforms. For web, it models with the client-side JavaScript tag. For apps, it models with the client-side SDK. It happens in real time, and enables pulling in external "sensitive" data, so it operates in the sweet spot between the two existing approaches.
 
 ## Why Soteria?
 
@@ -48,18 +33,22 @@ this project provides safety from end users to your sensitive value data (e.g.
 profit).
 
 ## Implementation
-Ready to start implementing this solution? You can follow the
-[full guide here](./docs/README.md) that outlines how Server Side Google Tag
-Manager (sGTM) can be used with Firestore, to pull in sensitive profit data
-(or other sensitive data) and report it to Google Analytics, Google Ads or
-Floodlights in place of revenue as the conversion value.
+
+### Web Implementation
+
+Ready to start implementing this solution for your website? You can follow the [full guide here](./docs/README.md) that outlines how Server Side Google Tag Manager (sGTM) can be used with Firestore, to pull in sensitive profit data (or other sensitive data) and report it to Google Analytics, Google Ads or Floodlights in place of revenue as the conversion value.
+
+![Demo gif](./docs/img/demo.gif)
+
+### App Implementation
+
+Ready to start implementing this solution for your mobile app? You can follow the [mobile app conversions guide here](./docs/mobile-apps.md) that outlines how Server Side Google Tag Manager (sGTM) can be used with Firestore, to pull in sensitive profit data (or other sensitive data) and report it to Google Analytics for Firebase and Google Ads in place of revenue as the conversion value.
 
 ## Mobile App Conversions
-Server-side Google Tag Manager (sGTM) doesn't currently offer direct support for
-mobile apps, but it's still possible to implement value based bidding strategies
-for your app, even with sensitive conversion values like profit.
 
-Read more about [mobile app conversions here](./docs/mobile-apps.md).
+Achieving value-based bidding with sensitive data like profit in mobile apps is possible using Server-Side Google Tag Manager (sGTM) in conjunction with Firestore. Here's a summary of the approach:
+
+![Demo gif](./docs/img/demo-apps.gif)
 
 ## Disclaimer
 __This is not an officially supported Google product.__
