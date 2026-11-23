@@ -134,6 +134,48 @@ ___TEMPLATE_PARAMETERS___
         ]
       }
     ]
+  },
+  {
+    "type": "GROUP",
+    "name": "telemetry",
+    "displayName": "Usage Telemetry (Optional)",
+    "groupStyle": "ZIPPY_CLOSED",
+    "subParams": [
+      {
+        "type": "CHECKBOX",
+        "name": "enableTelemetry",
+        "checkboxText": "Share anonymous usage telemetry with Google",
+        "simpleValueType": true,
+        "defaultValue": false,
+        "help": "When enabled, the variable sends at most one usage ping per day per server instance to Google, containing only the solution name and the Google Ads Customer ID below. No event, item, value or user data is sent. See this page for more information: https://github.com/google-marketing-solutions/gps_soteria/tree/main/docs#usage-telemetry"
+      },
+      {
+        "type": "TEXT",
+        "name": "googleAdsCustomerId",
+        "displayName": "Google Ads Customer ID",
+        "simpleValueType": true,
+        "help": "The Google Ads Customer ID that uses this variable, including hyphens, e.g. 123-456-7890.",
+        "valueHint": "123-456-7890",
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          },
+          {
+            "type": "REGEX",
+            "args": [
+              "^\\d{3}-\\d{3}-\\d{4}$"
+            ]
+          }
+        ],
+        "enablingConditions": [
+          {
+            "paramName": "enableTelemetry",
+            "paramValue": true,
+            "type": "EQUALS"
+          }
+        ]
+      }
+    ]
   }
 ]
 
@@ -159,17 +201,102 @@ ___SANDBOXED_JS_FOR_SERVER___
  * @fileoverview sGTM variable tag that uses data from Firestore to calculate a
  * new conversion value based on items in the datalayer.
  * @see {@link https://developers.google.com/analytics/devguides/collection/ga4/reference/events?client_type=gtag#purchase_item}
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 const Firestore = require("Firestore");
+const JSON = require("JSON");
 const Promise = require("Promise");
+const generateRandom = require("generateRandom");
 const getEventData = require("getEventData");
+const getTimestampMillis = require("getTimestampMillis");
 const logToConsole = require("logToConsole");
 const makeNumber = require("makeNumber");
 const makeString = require("makeString");
 const Math = require("Math");
 const getType = require("getType");
+const sendHttpRequest = require("sendHttpRequest");
+const templateDataStorage = require("templateDataStorage");
+
+// Opt-in usage telemetry, see docs/README.md#usage-telemetry.
+const TELEMETRY_URL = "https://www.google-analytics.com/mp/collect" +
+  "?measurement_id=G-Z2TKLQZ79K&api_secret=S7toNnNZQPWzViq44q_8gg";
+const TELEMETRY_APP_NAME = "Soteria";
+const TELEMETRY_STORAGE_KEY = "soteria_usage_telemetry_last_sent";
+const TELEMETRY_INTERVAL_MILLIS = 24 * 60 * 60 * 1000;
+// Length of a hyphenated Google Ads Customer ID, e.g. 123-456-7890.
+const CUSTOMER_ID_LENGTH = 12;
+
+
+/**
+ * Send a usage ping, if the user has opted in to usage telemetry.
+ *
+ * The ping is sent at most once per day per server instance, and only contains
+ * the solution name and the configured Google Ads Customer ID. It never
+ * contains event, item, value or user data.
+ *
+ * Telemetry must never affect the value returned by the variable: the request
+ * is not awaited, and any failure is only logged.
+ */
+function sendUsageTelemetry() {
+  if (data.enableTelemetry !== true) {
+    return;
+  }
+
+  const customerId = makeString(data.googleAdsCustomerId || "");
+  if (customerId.length !== CUSTOMER_ID_LENGTH) {
+    logToConsole("Usage telemetry skipped: invalid Google Ads Customer ID");
+    return;
+  }
+
+  // Mock API returns a function, whereas usual import is object.
+  let storage = templateDataStorage;
+  if (getType(templateDataStorage) === "function") {
+    storage = templateDataStorage();
+  }
+
+  const now = getTimestampMillis();
+  const lastSent = storage.getItemCopy(TELEMETRY_STORAGE_KEY);
+  if (getType(lastSent) === "number" &&
+      now - lastSent < TELEMETRY_INTERVAL_MILLIS) {
+    return;
+  }
+  // Set before sending, so concurrent events don't trigger multiple pings.
+  storage.setItemCopy(TELEMETRY_STORAGE_KEY, now);
+
+  // A random ID, that isn't linked to any user or event.
+  const pingId = makeString(now) + "-" +
+    makeString(generateRandom(1, 2147483647));
+  const payload = {
+    client_id: pingId,
+    non_personalized_ads: false,
+    events: [{
+      name: "SOLUTION_USAGE",
+      params: {
+        app: TELEMETRY_APP_NAME,
+        is_agent_event: false,
+        external_event_id: pingId,
+        // The hyphens must be kept in the customer ID.
+        th_google_ads_customer_id: customerId,
+      },
+    }],
+  };
+
+  const request = sendHttpRequest(
+    TELEMETRY_URL,
+    {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      timeout: 1000,
+    },
+    JSON.stringify(payload)
+  );
+  if (getType(request) === "object") {
+    request.catch((error) => {
+      logToConsole("Usage telemetry request failed", error);
+    });
+  }
+}
 
 
 /**
@@ -322,6 +449,7 @@ function getFirestoreValue(item) {
 // Entry point
 const items = getEventData("items");
 logToConsole("items", items);
+sendUsageTelemetry();
 return getItemValues(items)
   .then(sumValues)
   .catch((error) => {
@@ -424,6 +552,49 @@ ___SERVER_PERMISSIONS___
     },
     "clientAnnotations": {
       "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "send_http",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedUrls",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        },
+        {
+          "key": "urls",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "https://www.google-analytics.com/*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_template_storage",
+        "versionId": "1"
+      },
+      "param": []
     },
     "isRequired": true
   }
@@ -642,8 +813,260 @@ scenarios:
       assertThat(resp).isString();
       assertThat(resp).isEqualTo("6.31");
     });
+- name: Test telemetry is not sent by default
+  code: |
+    // A customer ID is set, so only the opt-in checkbox stops the ping.
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    const storage = addMockTemplateStorage(undefined);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isEqualTo("100");
+    });
+
+    assertThat(requests.length).isEqualTo(0);
+    assertThat(storage.lastSent).isUndefined();
+- name: Test telemetry is sent when opted in
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    mock("getTimestampMillis", () => 1700000000000);
+    const storage = addMockTemplateStorage(undefined);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isEqualTo("100");
+    });
+
+    assertThat(requests.length).isEqualTo(1);
+    assertThat(requests[0].url).isEqualTo(
+      "https://www.google-analytics.com/mp/collect" +
+      "?measurement_id=G-Z2TKLQZ79K&api_secret=S7toNnNZQPWzViq44q_8gg");
+    assertThat(requests[0].options.method).isEqualTo("POST");
+
+    const payload = JSON.parse(requests[0].body);
+    assertThat(payload.events.length).isEqualTo(1);
+    assertThat(payload.events[0].name).isEqualTo("SOLUTION_USAGE");
+    assertThat(payload.events[0].params.app).isEqualTo("Soteria");
+    assertThat(payload.events[0].params.th_google_ads_customer_id)
+      .isEqualTo("123-456-7890");
+    assertThat(payload.events[0].params.external_event_id).isString();
+    assertThat(payload.events[0].params.external_event_id)
+      .isEqualTo(payload.client_id);
+    assertThat(storage.lastSent).isEqualTo(1700000000000);
+- name: Test telemetry payload does not contain event data
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "secret-sku", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "secret-sku": {"data": {"profit": 100}}
+    });
+
+    addMockTemplateStorage(undefined);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData);
+
+    assertThat(requests.length).isEqualTo(1);
+    assertThat(requests[0].body.indexOf("secret-sku")).isEqualTo(-1);
+    assertThat(requests[0].body.indexOf("products")).isEqualTo(-1);
+    assertThat(requests[0].body.indexOf("profit")).isEqualTo(-1);
+- name: Test telemetry is throttled to once per day
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    const oneHourMillis = 60 * 60 * 1000;
+    mock("getTimestampMillis", () => 1700000000000);
+    const storage = addMockTemplateStorage(1700000000000 - oneHourMillis);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isEqualTo("100");
+    });
+
+    assertThat(requests.length).isEqualTo(0);
+    assertThat(storage.lastSent).isEqualTo(1700000000000 - oneHourMillis);
+- name: Test telemetry is sent again after a day
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    const twoDaysMillis = 2 * 24 * 60 * 60 * 1000;
+    mock("getTimestampMillis", () => 1700000000000);
+    const storage = addMockTemplateStorage(1700000000000 - twoDaysMillis);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData);
+
+    assertThat(requests.length).isEqualTo(1);
+    assertThat(storage.lastSent).isEqualTo(1700000000000);
+- name: Test telemetry is skipped with an invalid customer ID
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "1234567890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 1, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    const storage = addMockTemplateStorage(undefined);
+    const requests = addMockSendHttpRequest(true);
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isEqualTo("100");
+    });
+
+    assertThat(requests.length).isEqualTo(0);
+    assertThat(storage.lastSent).isUndefined();
+- name: Test value is returned when the telemetry request fails
+  code: |
+    const mockData = {
+      collectionId: "products",
+      valueCalculation: "valueQuantity",
+      valueField: "profit",
+      fallbackValueIfNotFound: "percent",
+      enableTelemetry: true,
+      googleAdsCustomerId: "123-456-7890",
+    };
+
+    addMockEventData([
+      {"item_id": "sku1", "quantity": 2, "price": 150}
+    ]);
+
+    addMockFirestore({
+      "sku1": {"data": {"profit": 100}}
+    });
+
+    addMockTemplateStorage(undefined);
+    const requests = addMockSendHttpRequest(false);
+
+    runCode(mockData).then((resp) => {
+      assertThat(resp).isString();
+      assertThat(resp).isEqualTo("200");
+    });
+
+    assertThat(requests.length).isEqualTo(1);
 setup: |-
+  const JSON = require("JSON");
   const Promise = require("Promise");
+
+  /**
+   * Add mock templateDataStorage library to the test.
+   * @param {number|undefined} lastSent when the telemetry was last sent.
+   * @returns {!Object} an object where lastSent is the stored timestamp.
+   */
+  function addMockTemplateStorage(lastSent){
+    const storage = {"lastSent": lastSent};
+    mock("templateDataStorage", () => {
+      return {
+        "getItemCopy": (key) => storage.lastSent,
+        "setItemCopy": (key, value) => {
+          storage.lastSent = value;
+        }
+      };
+    });
+    return storage;
+  }
+
+  /**
+   * Add mock sendHttpRequest to the test.
+   * @param {boolean} succeed whether the request should succeed.
+   * @returns {!Array<!Object>} the requests that have been sent.
+   */
+  function addMockSendHttpRequest(succeed){
+    const requests = [];
+    mock("sendHttpRequest", (url, options, body) => {
+      requests.push({"url": url, "options": options, "body": body});
+      return Promise.create((resolve, reject) => {
+        if (succeed) {
+          resolve({"statusCode": 204});
+        } else {
+          reject("Request failed");
+        }
+      });
+    });
+    return requests;
+  }
 
   /**
    * Add mock getEventData to the test.
