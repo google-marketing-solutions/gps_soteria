@@ -18,6 +18,7 @@
       - [Google Tag Manager](#google-tag-manager)
 - [Value Calculation](#value-calculation)
   - [Using AI in place of Firestore](#using-ai-in-place-of-firestore)
+- [Usage Telemetry](#usage-telemetry)
 - [Disclaimer](#disclaimer)
 
 ## Overview
@@ -356,6 +357,34 @@ approach.
 If you're interested in leveraging an AI model instead of static lookups in
 Firestore, then consider the [Phoebe solution on Github](
 https://github.com/google/gps-phoebe).
+
+## Usage Telemetry
+
+The variable template can optionally share anonymous usage telemetry with
+Google. This helps us understand how widely Soteria is used, and prioritise
+future work on it.
+
+**Telemetry is disabled by default.** To opt in, open the variable in Tag
+Manager, expand the `Usage Telemetry (Optional)` section, tick `Share anonymous
+usage telemetry with Google` and enter your Google Ads Customer ID including the
+hyphens, e.g. `123-456-7890`. Untick the checkbox at any time to opt out.
+
+When enabled:
+
+- A usage ping is sent to Google Analytics at most once per day, for each sGTM
+  server instance.
+- The ping only contains the solution name (`Soteria`), the Google Ads Customer
+  ID you entered, and a random ID that is generated for that ping.
+- No event, item, product, value, profit, Firestore or user data is ever sent.
+- The ping is sent in the background. If it fails, the error is logged, and the
+  value returned by the variable is not affected.
+
+The template requests two extra permissions for this, which are only used when
+you have opted in:
+
+- `Sends HTTP requests` to `https://www.google-analytics.com/*`, to send the
+  ping.
+- `Accesses template storage`, to remember when the last ping was sent.
 
 ## Disclaimer
 
